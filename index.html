@@ -8,10 +8,13 @@
   const gridSize = 20;
   const startingPositionOffset = 3;
   const playerHandCount = 8;
+  const allowOffscreenPlacements = false;
 
   // some useful constants
     // (i'm a colemak main)
   const allLetters = "qwfpgjluyarstdhneiozxcvbkm";
+  const weightedLettersList = 
+  "aaaaeeeiiiooouudhndhnrrrssssllhttqwfpgjluyarstdhneiozxcvbkm";
 
   // variables
   let localPlayerId = 0;
@@ -20,7 +23,7 @@
   function generateRandomLetters(count) {
     let letters = [];
     for(let i = 0; i < count; i++) {
-      letters.push(allLetters[Math.floor(Math.random() * allLetters.length)]);
+      letters.push(weightedLettersList[Math.floor(Math.random() * weightedLettersList.length)]);
     }
     return letters;
   }
@@ -78,13 +81,18 @@
     this.p1LastPressed = {};
     this.p2LastPressed = {};
 
+    this.winner = "0";
+
   }
-  validatePlacement(processedWord, x, y, vertical, heldCounts) {
-    // let boardSuppliedUses = Object.assign({}, letterCountsInWords);
+  validatePlacement(processedWord, x, y, vertical, heldCounts, playerNum) {
+
+    let playerNumFound = false;
     let requiredHeldLetters = {};
     for (let letter in heldCounts) {
       requiredHeldLetters[letter] = 0;
     }
+
+    let placementIndices = [];
     for (let i = 0; i < processedWord.length; i++) {
       let pwl = processedWord[i];
 
@@ -96,39 +104,151 @@
       else {
         tx = x + i;
       }
+      placementIndices.push(tx + ty * gridSize);
+
+      // check for off-screen placement
+      if ((tx < 0 || tx >= gridSize) || (ty < 0 || ty >= gridSize)) {
+        if (!allowOffscreenPlacements) {
+          return null;
+        }
+      }
 
 
       let tile = this.board[tx + ty * gridSize];
+      if (tile == null) tile = "";
       // only check for negative cases and return out if it is invalid
         // if this letter is on the board and it does not match, invalid
       if (tile == "") {
         // if the letter is missing on the board and we don't have it, invalid
         if (pwl[1] == "m") {
-          console.log(processedWord + " no letters in hand" + processedWord);
-          return false;
+          return null;
         }
         requiredHeldLetters[pwl[0]] += 1;
         // if we don't have enough, invalid
         if (requiredHeldLetters[pwl[0]] > heldCounts[pwl[0]]) {
-          console.log(processedWord + "not enough letters in hand");
-
-          return false;
+          return null;
         }
       }
       // if the slot is not empty and does not match, invalid
-      else if (tile[0] != pwl[0]) {
-        return false;
+      else {
+        if (tile[1] == playerNum) playerNumFound = true;
+        if (tile[0] != pwl[0]) {
+          return null;
+        }
       }
     }
-    return true;
+    
+    if (playerNumFound) {
+      // check if the words are valid
+      let rowsToCheck = [y];
+      let columnsToCheck = [x];
+      if (vertical) {
+        for (let r = 1; r < processedWord.length; r++) {
+          rowsToCheck.push(y + r);
+        }
+      }
+      else {
+        for (let c = 1; c < processedWord.length; c++) {
+          columnsToCheck.push(x + c);
+        }
+      }
+
+      for (let ry of rowsToCheck) {
+        let currentWord = "";
+        let intersected = false;
+        // |a|b| |a|b|B| 
+        for (let rx = 0; rx < gridSize + 1; rx++) {
+          let tileIndex = rx + ry * gridSize;
+          let tile = this.board[tileIndex][0];
+          
+          // check intersection with current placement
+          let placementIndex = placementIndices.indexOf(tileIndex);
+          if (placementIndex >= 0) {
+            intersected = true;
+            tile = processedWord[placementIndex][0];
+          }
+
+          if (tile == null || tile == "" || rx >= gridSize) {
+            // end case
+            if(intersected) {
+              // console.log("row: " + ry + "vertical: " + vertical);
+              // console.log(currentWord);
+              // console.log(currentWord.toUpperCase());
+              // console.log(currentWord.toUpperCase() in scrabbleWords);
+              // if (!(true) && currentWord.length > 1) {
+              if (!(currentWord.toUpperCase() in scrabbleWords) && currentWord.length > 1) {
+                return null;
+              }
+            }
+            currentWord = "";
+            intersected = false;
+          }
+          else {
+            currentWord += tile;
+          }
+        }
+      }
+      
+      for (let cx of columnsToCheck) {
+        let currentWord = "";
+        let intersected = false;
+        // |a|b| |a|b|B| 
+        for (let cy = 0; cy < gridSize; cy++) {
+          let tileIndex = cx + cy * gridSize;
+          let tile = this.board[tileIndex];
+          if (tile == null) {
+            tile = "";
+          }
+          else {
+            tile = tile[0];
+          }
+          
+          // check intersection with current placement
+          let placementIndex = placementIndices.indexOf(tileIndex);
+          if (placementIndex >= 0) {
+            intersected = true;
+            tile = processedWord[placementIndex][0];
+          }
+
+          if (tile == null || tile == "" || cy >= gridSize) {
+            // end case
+            if(intersected) {
+              // console.log("col: " + cy + "vertical: " + vertical);
+              // console.log(currentWord);
+              // console.log(currentWord.toUpperCase());
+              // console.log(currentWord.toUpperCase() in scrabbleWords);
+              if (!(currentWord.toUpperCase() in scrabbleWords) && currentWord.length > 1) {
+                return null;
+              }
+            }
+            currentWord = "";
+            intersected = false;
+          }
+          else {
+            currentWord += tile;
+          }
+        }
+      }
+
+
+      let requiredLetters = [];
+      for (let l in requiredHeldLetters) {
+        for (let i = 0; i < requiredHeldLetters[l]; i++) {
+          requiredLetters.push(l);
+        }
+      }
+
+      return requiredLetters;
+    }
   }
 
-  findValidLocations(word, letters) {
+  findValidLocations(word, letters, playerNum) {
     let validPlacements = [];
-
 
     let processedWord = [];
     let firstMissingLetter = "";
+
+    let playerFound = false;
     
     // let letterCountsInWord = {};
     let heldCounts = {};
@@ -148,7 +268,6 @@
     let missingLetterLocations = [];
     for (let wl of word) {
       if (letters.indexOf(wl) >= 0) {
-        // if (letterCountsInWord[wl] < heldCounts[wl]) letterCountsInWord[wl] += 1;
         processedWord.push(wl + "h");
       }
       else {
@@ -169,13 +288,13 @@
       // if (firstMissingLetter == tile[0]) {
         // check all possible locations of missing letter
       for (let i = 0; i < processedWord.length; i++) {
-        if (this.validatePlacement(processedWord, x - i, y, false, heldCounts)) {
-          console.log(processedWord + " valid placement " + (x - i) + ", " + y);
-          validPlacements.push({x: x - i, y: y, vertical: false});
+        let usedLetters = this.validatePlacement(processedWord, x - i, y, false, heldCounts, playerNum);
+        if (usedLetters != null) {
+          validPlacements.push({x: x - i, y: y, vertical: false, usedLetters: usedLetters});
         }
-        if (this.validatePlacement(processedWord, x, y - i, true, heldCounts)) {
-          console.log(processedWord + " valid placement " + x + ", " + (y -i));
-          validPlacements.push({x: x, y: y - i, vertical: true});
+        usedLetters = this.validatePlacement(processedWord, x, y - i, true, heldCounts, playerNum);
+        if (usedLetters != null) {
+          validPlacements.push({x: x, y: y - i, vertical: true, usedLetters: usedLetters});
         }
       }
       // }
@@ -187,6 +306,9 @@
   // simulates the game forward. Think of it like making
   // a local multiplayer game with multiple controllers.
   tick(playerInputs) {
+    if (this.winner != "0") {
+      return;
+    }
     for (const [player, input] of playerInputs.entries()) {
       // // Generate player velocity from input keys.
       // const vel = {
@@ -210,7 +332,7 @@
           this.p1LocationSelection += 1;
         }
         if(input.pressed.Enter && !("Enter" in this.p1LastPressed)) {
-          let validLocations = this.findValidLocations(this.p1Queue, this.p1Letters);
+          let validLocations = this.findValidLocations(this.p1Queue, this.p1Letters, "1");
 
           if (validLocations.length > 0) {
             //clear off player 1 tag from existing letters
@@ -230,11 +352,32 @@
               else {
                 tileX = validLocation.x + z;
               }
+              for (let wx = tileX - 1; wx < tileX + 2; wx++) {
+                if (this.board[wx + tileY * gridSize][1] == "2") {
+                  this.winner = "1";
+                }
+              }
+              for (let wy = tileY - 1; wy < tileY + 2; wy++) {
+                if (this.board[tileX + wy * gridSize][1] == "2") {
+                  this.winner = "1";
+                }
+              }
 
               this.board[tileX + tileY * gridSize] = this.p1Queue[z] + "1";
             }
             this.p1Queue = "";
-            this.p1Letters = generateRandomLetters(playerHandCount);
+            
+            let newLetters = [];
+            for (let letter of this.p1Letters) {
+              let letterIndex = validLocation.usedLetters.indexOf(letter);
+              if (letterIndex >= 0) {
+                validLocation.usedLetters.splice(letterIndex,1);
+              }
+              else {
+                newLetters.push(letter);
+              }
+            }
+            this.p1Letters = newLetters.concat(generateRandomLetters(playerHandCount - newLetters.length));
           }
         }
         if(input.pressed.Backspace) {
@@ -253,7 +396,7 @@
           this.p2LocationSelection += 1;
         }
         if(input.pressed.Enter && !("Enter" in this.p2LastPressed)) {
-          let validLocations = this.findValidLocations(this.p2Queue, this.p2Letters);
+          let validLocations = this.findValidLocations(this.p2Queue, this.p2Letters, "2");
 
           if (validLocations.length > 0) {
             //clear off player 1 tag from existing letters
@@ -274,10 +417,32 @@
                 tileX = validLocation.x + z;
               }
 
+              for (let wx = tileX - 1; wx < tileX + 2; wx++) {
+                if (this.board[wx + tileY * gridSize][1] == "1") {
+                  this.winner = "2";
+                }
+              }
+              for (let wy = tileY - 1; wy < tileY + 2; wy++) {
+                if (this.board[tileX + wy * gridSize][1] == "1") {
+                  this.winner = "2";
+                }
+              }
+
               this.board[tileX + tileY * gridSize] = this.p2Queue[z] + "2";
             }
             this.p2Queue = "";
-            this.p2Letters = generateRandomLetters(playerHandCount);
+
+            let newLetters = [];
+            for (let letter of this.p2Letters) {
+              let letterIndex = validLocation.usedLetters.indexOf(letter);
+              if (letterIndex >= 0) {
+                validLocation.usedLetters.splice(letterIndex,1);
+              }
+              else {
+                newLetters.push(letter);
+              }
+            }
+            this.p2Letters = newLetters.concat(generateRandomLetters(playerHandCount - newLetters.length));
           }
         }
         if(input.pressed.Backspace) {
@@ -287,22 +452,9 @@
         this.p2LastPressed = Object.assign({},input.pressed);
       }
 
-      // if(input.pressed["ArrowLeft"]) {
-      //   this.test = Math.random();
-      //   console.log(input);
-      // }
-
-
     }
   }
 
-  // Normally, we have to implement a serialize / deserialize function
-  // for our state. However, there is an autoserializer that can handle
-  // simple states for us. We don't need to do anything here!
-  // serialize() {}
-  // deserialize(value) {}
-
-  // Draw the state of our game onto a canvas.
   draw(canvas) {
     const ctx = canvas.getContext("2d");
 
@@ -342,51 +494,69 @@
         }
       }
     }
-    let charsToDraw = this.p1Letters;
-    let currentQueue = this.p1Queue;
-    let locationSelection = this.p1LocationSelection;
-    if (localPlayerId == 1) { 
-      charsToDraw = this.p2Letters;
-      currentQueue = this.p2Queue;
-      locationSelection = this.p2LocationSelection;
+    if (this.winner != "0") {
+      ctx.font = '25px Arial';
+      ctx.textBaseline = 'middle'; 
+      ctx.textAlign = 'center'; 
+      ctx.fillStyle = 'white';
+      let winText = "player " + this.winner + " wins!";
+      for(let x = 0; x < winText.length; x++) {
+
+        let tileStartX = xBoardStart + x * tileSize;
+        let tileStartY = yBoardStart + (gridSize - 1) * tileSize
+        
+        ctx.fillText(winText[x], tileStartX + tileSize/2, tileStartY + tileSize/2);
+      }
     }
+    else {
+      let charsToDraw = this.p1Letters;
+      let currentQueue = this.p1Queue;
+      let locationSelection = this.p1LocationSelection;
+      let playerNum = "1";
+      if (localPlayerId == 1) { 
+        charsToDraw = this.p2Letters;
+        currentQueue = this.p2Queue;
+        locationSelection = this.p2LocationSelection;
+        playerNum = "2";
+      }
 
-    ctx.font = '25px Arial';
-    ctx.textBaseline = 'middle'; 
-    ctx.textAlign = 'center'; 
-    ctx.fillStyle = 'white';
-    for(let x = 0; x < charsToDraw.length; x++) {
+      ctx.font = '25px Arial';
+      ctx.textBaseline = 'middle'; 
+      ctx.textAlign = 'center'; 
+      ctx.fillStyle = 'white';
+      for(let x = 0; x < charsToDraw.length; x++) {
 
-      let tileStartX = xBoardStart + x * tileSize;
-      let tileStartY = yBoardStart + (gridSize - 1) * tileSize
-      
-      ctx.fillText(charsToDraw[x], tileStartX + tileSize/2, tileStartY + tileSize/2);
-    }
-    for(let x = 0; x < currentQueue.length; x++) {
+        let tileStartX = xBoardStart + x * tileSize;
+        let tileStartY = yBoardStart + (gridSize - 1) * tileSize
+        
+        ctx.fillText(charsToDraw[x], tileStartX + tileSize/2, tileStartY + tileSize/2);
+      }
+      for(let x = 0; x < currentQueue.length; x++) {
 
-      let tileStartX = xBoardStart + gridSize * tileSize - (x + 1) * tileSize;
-      let tileStartY = yBoardStart + (gridSize - 1) * tileSize
-      
-      ctx.fillText(currentQueue[currentQueue.length - x - 1], tileStartX + tileSize/2, tileStartY + tileSize/2);
-    }
+        let tileStartX = xBoardStart + gridSize * tileSize - (x + 1) * tileSize;
+        let tileStartY = yBoardStart + (gridSize - 1) * tileSize
+        
+        ctx.fillText(currentQueue[currentQueue.length - x - 1], tileStartX + tileSize/2, tileStartY + tileSize/2);
+      }
 
-    let validLocations = this.findValidLocations(currentQueue, charsToDraw);
+      let validLocations = this.findValidLocations(currentQueue, charsToDraw, playerNum);
 
-    if (validLocations.length > 0) {
-      let validLocation = validLocations[locationSelection % validLocations.length];
-      for(let z = 0; z < currentQueue.length; z++) {
+      if (validLocations.length > 0) {
+        let validLocation = validLocations[locationSelection % validLocations.length];
+        for(let z = 0; z < currentQueue.length; z++) {
 
-        let tileStartX = xBoardStart + validLocation.x * tileSize;
-        let tileStartY = yBoardStart + validLocation.y * tileSize;
+          let tileStartX = xBoardStart + validLocation.x * tileSize;
+          let tileStartY = yBoardStart + validLocation.y * tileSize;
 
-        if (validLocation.vertical) {
-          tileStartY = yBoardStart + (validLocation.y + z) * tileSize;
+          if (validLocation.vertical) {
+            tileStartY = yBoardStart + (validLocation.y + z) * tileSize;
+          }
+          else {
+            tileStartX = xBoardStart + (validLocation.x + z) * tileSize;
+          }
+
+          ctx.fillText(currentQueue[z], tileStartX + tileSize/2, tileStartY + tileSize/2);
         }
-        else {
-          tileStartX = xBoardStart + (validLocation.x + z) * tileSize;
-        }
-
-        ctx.fillText(currentQueue[z], tileStartX + tileSize/2, tileStartY + tileSize/2);
       }
     }
     // // Draw squares for the players.
