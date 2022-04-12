@@ -65,6 +65,10 @@ function shuffle(array) {
       }
     }
 
+    this.resetGame();
+  }
+  
+  resetGame() {
     // the board is ordered left to right, top to bottom like this:
     //  0  1  2  3
     //  4  5  6  7
@@ -110,7 +114,6 @@ function shuffle(array) {
     this.winner = "0";
     this.currentFrame = 0;
   }
-  
 
   makeEmptyTile() {
     return {
@@ -353,6 +356,7 @@ function shuffle(array) {
     if (this.winner != "0") {
       return;
     }
+    let allPlayersResetting = true;
     for (const [player, input] of playerInputs.entries()) {
 
       let pid = parseInt(player.getID());
@@ -370,6 +374,9 @@ function shuffle(array) {
       }
       if(input.pressed["2"] && !("2" in this.players[pid].lastPressed)) {
         shuffle(this.players[pid].letters);
+      }
+      if(!input.pressed["3"]) {
+        allPlayersResetting = false;
       }
       if(input.pressed.Shift && !("Shift" in this.players[pid].lastPressed)) {
         this.players[pid].locationSelection += 1;
@@ -437,6 +444,9 @@ function shuffle(array) {
       }
       this.players[pid].lastPressed = Object.assign({},input.pressed);
       this.players[pid].meter = Math.max(0, Math.min(100, this.players[pid].meter + meterIncreasePerFrame));
+    }
+    if (allPlayersResetting) {
+      this.resetGame();
     }
     for (let tile of this.board) {
       if (tile.frame + tileLifespan < this.currentFrame && tile.player == "") {
