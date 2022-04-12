@@ -26,13 +26,22 @@ function shuffle(array) {
   const startingPositionOffset = 5;
   const playerHandCount = 8;
   const allowOffscreenPlacements = false;
-  const tileLifespan = 35 * 60;
+  const tileLifespan = 60 * 60;
+  const meterIncreasePerFrame = .4/60;
+
+  const rerollMeterCost = 33;
+  const meterGainMultiplier = 4;
 
   // some useful constants
     // (i'm a colemak main)
   const allLetters = "qwfpgjluyarstdhneiozxcvbkm";
   const weightedLettersList = 
   "aaaaeeeiiiooouudhndhnrrrssssllhttqwfpgjluyarstdhneiozxcvbkm";
+  let letterScores = {};
+  for(let letter of allLetters) {
+    let inverseFrequency = 1 - (weightedLettersList.split('').filter(x => x==letter).length/weightedLettersList.length);
+    letterScores[letter] = meterGainMultiplier * Math.pow(inverseFrequency, 13);
+  }
 
   // variables
   let localPlayerId = 0;
@@ -93,6 +102,7 @@ function shuffle(array) {
         queue: "",
         locationSelection: 0,
         lastPressed: {},
+        meter: 0,
       };
       this.players.push(player);
     }
@@ -353,7 +363,10 @@ function shuffle(array) {
         }
       }
       if(input.pressed["1"] && !("1" in this.players[pid].lastPressed)) {
-        this.players[pid].letters = generateRandomLetters(playerHandCount);
+        if (this.players[pid].meter > rerollMeterCost) {
+          this.players[pid].letters = generateRandomLetters(playerHandCount);
+          this.players[pid].meter -= rerollMeterCost;
+        }
       }
       if(input.pressed["2"] && !("2" in this.players[pid].lastPressed)) {
         shuffle(this.players[pid].letters);
@@ -365,13 +378,18 @@ function shuffle(array) {
         let validLocations = this.findValidLocations(this.players[pid].queue, this.players[pid].letters, "" + (pid + 1));
 
         if (validLocations.length > 0) {
+          let wordScore = 0;
           //clear off player 1 tag from existing letters
           for (let ti = 0; ti < this.board.length; ti++) {
-            if(this.board[ti].player == "" + (pid + 1)) this.board[ti].player = "";
+            if(this.board[ti].player == "" + (pid + 1)) {
+              this.board[ti].player = "";
+              this.board[ti].frame = this.currentFrame;
+            }
           }
 
           let validLocation = validLocations[this.players[pid].locationSelection % validLocations.length];
           for(let z = 0; z < this.players[pid].queue.length; z++) {
+            wordScore += letterScores[this.players[pid].queue[z]];
 
             let tileX = validLocation.x;
             let tileY = validLocation.y;
@@ -398,6 +416,7 @@ function shuffle(array) {
             this.board[tileX + tileY * gridSize].frame = this.currentFrame;
           }
           this.players[pid].queue = "";
+          this.players[pid].meter += wordScore;
           
           let newLetters = [];
           for (let letter of this.players[pid].letters) {
@@ -417,7 +436,7 @@ function shuffle(array) {
         this.players[pid].LocationSelection = 0;
       }
       this.players[pid].lastPressed = Object.assign({},input.pressed);
-
+      this.players[pid].meter = Math.max(0, Math.min(100, this.players[pid].meter + meterIncreasePerFrame));
     }
     for (let tile of this.board) {
       if (tile.frame + tileLifespan < this.currentFrame && tile.player == "") {
@@ -428,23 +447,31 @@ function shuffle(array) {
   }
 
   draw(canvas) {
+    let smallerDimension = Math.min(canvas.width, canvas.height);
+    let tileSize = smallerDimension/gridSize;
+    let xBoardStart = canvas.width/2 - smallerDimension/2;
+    let yBoardStart = canvas.height/2 - smallerDimension/2;
+
     const ctx = canvas.getContext("2d");
 
     // Fill with black.
     ctx.fillStyle = "black";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    let smallerDimension = Math.min(canvas.width, canvas.height);
-    let tileSize = smallerDimension/gridSize;
-    let xBoardStart = canvas.width/2 - smallerDimension/2;
-    let yBoardStart = canvas.height/2 - smallerDimension/2;
+    ctx.fillStyle = 'darkblue';
+    if (localPlayerId == 0) {
+      ctx.fillStyle = 'darkred';
+    }
+    ctx.fillRect(0, canvas.height - tileSize, canvas.width * this.players[localPlayerId].meter/100, canvas.height);
+
+
     for(let x = 0; x < gridSize; x++) {
       for(let y = 0; y < gridSize - 1; y++) {
         let tile = this.board[x + y * gridSize];
 
         let tileStartX = xBoardStart + x * tileSize;
         let tileStartY = yBoardStart + y * tileSize
-        ctx.strokeStyle = "darkgrey";
+        ctx.strokeStyle = "#575757";
         ctx.strokeRect(tileStartX, tileStartY, tileSize, tileSize);
 
         if (tile.letter != "") {
@@ -459,11 +486,12 @@ function shuffle(array) {
             ctx.fillStyle = 'lightblue';
           }
           else {
-            ctx.fillStyle = 'grey';
+            ctx.fillStyle = 'lightgrey';
+            ctx.globalAlpha = 0.7 + 0.3 * (tile.frame - this.currentFrame)/tileLifespan;
           }
 
-          // console.log(tile);
           ctx.fillText(tile.letter, tileStartX + tileSize/2, tileStartY + tileSize/2);
+          ctx.globalAlpha = 1.0;
         }
       }
     }
