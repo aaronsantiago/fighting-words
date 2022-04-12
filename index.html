@@ -3,6 +3,23 @@
 <script src="scripts/scrabbleWords.js"></script>
 <body></body>
 <script>
+function shuffle(array) {
+  let currentIndex = array.length,  randomIndex;
+
+  // While there remain elements to shuffle.
+  while (currentIndex != 0) {
+
+    // Pick a remaining element.
+    randomIndex = Math.floor(Math.random() * currentIndex);
+    currentIndex--;
+
+    // And swap it with the current element.
+    [array[currentIndex], array[randomIndex]] = [
+      array[randomIndex], array[currentIndex]];
+  }
+
+  return array;
+}
 
   // some variables to control the overall game
   const gridSize = 20;
@@ -337,6 +354,9 @@
       }
       if(input.pressed["1"] && !("1" in this.players[pid].lastPressed)) {
         this.players[pid].letters = generateRandomLetters(playerHandCount);
+      }
+      if(input.pressed["2"] && !("2" in this.players[pid].lastPressed)) {
+        shuffle(this.players[pid].letters);
       }
       if(input.pressed.Shift && !("Shift" in this.players[pid].lastPressed)) {
         this.players[pid].locationSelection += 1;
