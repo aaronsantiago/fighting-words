@@ -19,6 +19,13 @@
   // variables
   let localPlayerId = 0;
 
+  function makeEmptyTile() {
+    return {
+      letter: "",
+      player: "",
+    };
+  }
+
   // utility functions
   function generateRandomLetters(count) {
     let letters = [];
@@ -56,15 +63,16 @@
     this.board = [];
     // leave room for the stack at the bottom
     for(let i = 0; i < gridSize * (gridSize - 1); i++) {
+      let tile = makeEmptyTile();
       if (i == p1Pos) {
-        this.board.push("a1");
+        tile.letter = "a";
+        tile.player = "1";
       }
       else if (i == p2Pos) {
-        this.board.push("a2");
+        tile.letter = "a";
+        tile.player = "2";
       }
-      else {
-        this.board.push("");
-      }
+      this.board.push(tile);
     }
 
     this.players = [];
@@ -78,23 +86,10 @@
       this.players.push(player);
     }
 
-    // // generate the player letters
-    // this.p1Letters = generateRandomLetters(playerHandCount);
-    // this.p2Letters = generateRandomLetters(playerHandCount);
-
-    // this.p1Queue = "";
-    // this.p2Queue = "";
-
-    // this.p1LocationSelection = 0;
-    // this.p2LocationSelection = 0;
-
-    // // need this to only respond to keydowns
-    // this.p1LastPressed = {};
-    // this.p2LastPressed = {};
-
     this.winner = "0";
 
   }
+
   validatePlacement(processedWord, x, y, vertical, heldCounts, playerNum) {
 
     let playerNumFound = false;
@@ -128,10 +123,10 @@
 
 
       let tile = this.board[tx + ty * gridSize];
-      if (tile == null) tile = "";
+      if (tile == null) tile = makeEmptyTile();
       // only check for negative cases and return out if it is invalid
         // if this letter is on the board and it does not match, invalid
-      if (tile == "") {
+      if (tile.letter == "") {
         placementInEmptyTileFound = true;
 
         // if the letter is missing on the board and we don't have it, invalid
@@ -145,10 +140,10 @@
         }
       }
       else {
-        if (tile[1] == playerNum) playerNumFound = true;
+        if (tile.player == playerNum) playerNumFound = true;
         
         // if the slot is not empty and does not match, invalid
-        if (tile[0] != pwl[0]) {
+        if (tile.letter != pwl[0]) {
           return null;
         }
       }
@@ -176,16 +171,23 @@
         // |a|b| |a|b|B| 
         for (let rx = 0; rx < gridSize + 1; rx++) {
           let tileIndex = rx + ry * gridSize;
-          let tile = this.board[tileIndex][0];
+          let tileLetter = this.board[tileIndex]?.letter;
           
           // check intersection with current placement
           let placementIndex = placementIndices.indexOf(tileIndex);
           if (placementIndex >= 0) {
             intersected = true;
-            tile = processedWord[placementIndex][0];
+            // TODO: not this
+            try {
+              tileLetter = processedWord[placementIndex][0];
+            }
+            catch(e) {
+              console.log("the bad thing happened");
+              return null;
+            }
           }
 
-          if (tile == null || tile == "" || rx >= gridSize) {
+          if (tileLetter == null || tileLetter == "" || rx >= gridSize) {
             // end case
             if(intersected) {
               // console.log("row: " + ry + "vertical: " + vertical);
@@ -201,7 +203,7 @@
             intersected = false;
           }
           else {
-            currentWord += tile;
+            currentWord += tileLetter;
           }
         }
       }
@@ -214,10 +216,10 @@
           let tileIndex = cx + cy * gridSize;
           let tile = this.board[tileIndex];
           if (tile == null) {
-            tile = "";
+            tile = makeEmptyTile();
           }
           else {
-            tile = tile[0];
+            tile = tile.letter;
           }
           
           // check intersection with current placement
@@ -227,7 +229,7 @@
             tile = processedWord[placementIndex][0];
           }
 
-          if (tile == null || tile == "" || cy >= gridSize) {
+          if (tile == null || tile.letter == "" || cy >= gridSize) {
             // end case
             if(intersected) {
               // console.log("col: " + cy + "vertical: " + vertical);
@@ -299,7 +301,7 @@
       let tile = this.board[t];
 
       // skip processing any spaces that don't have letters in them
-      if (tile == "") continue;
+      if (tile.letter == "") continue;
       let x = t % gridSize;
       let y = Math.floor(t/gridSize);
       // if (firstMissingLetter == tile[0]) {
@@ -344,7 +346,7 @@
         if (validLocations.length > 0) {
           //clear off player 1 tag from existing letters
           for (let ti = 0; ti < this.board.length; ti++) {
-            if(this.board[ti][1] == "" + (pid + 1)) this.board[ti] = this.board[ti][0];
+            if(this.board[ti].player == "" + (pid + 1)) this.board[ti].player = "";
           }
 
           let validLocation = validLocations[this.players[pid].locationSelection % validLocations.length];
@@ -360,17 +362,18 @@
               tileX = validLocation.x + z;
             }
             for (let wx = tileX - 1; wx < tileX + 2; wx++) {
-              if (this.board[wx + tileY * gridSize][1] == "" + (1 - pid + 1)) {
+              if (this.board[wx + tileY * gridSize].player == "" + (1 - pid + 1)) {
                 this.winner = "" + (pid + 1);
               }
             }
             for (let wy = tileY - 1; wy < tileY + 2; wy++) {
-              if (this.board[tileX + wy * gridSize][1] == "" + (1 - pid + 1)) {
+              if (this.board[tileX + wy * gridSize].player == "" + (1 - pid + 1)) {
                 this.winner = "" + (pid + 1);
               }
             }
 
-            this.board[tileX + tileY * gridSize] = this.players[pid].queue[z] + "" + (pid + 1);
+            this.board[tileX + tileY * gridSize].letter = this.players[pid].queue[z];
+            this.board[tileX + tileY * gridSize].player = "" + (pid + 1);
           }
           this.players[pid].queue = "";
           
@@ -416,22 +419,23 @@
         ctx.strokeStyle = "darkgrey";
         ctx.strokeRect(tileStartX, tileStartY, tileSize, tileSize);
 
-        if (tile != "") {
+        if (tile.letter != "") {
           ctx.font = '25px Arial';
           ctx.textBaseline = 'middle'; 
           ctx.textAlign = 'center'; 
 
-          if (tile[1] == "1") {
+          if (tile.player == "1") {
             ctx.fillStyle = 'red';
           }
-          else if (tile[1] == "2") {
+          else if (tile.player == "2") {
             ctx.fillStyle = 'lightblue';
           }
           else {
             ctx.fillStyle = 'grey';
           }
 
-          ctx.fillText(tile[0], tileStartX + tileSize/2, tileStartY + tileSize/2);
+          // console.log(tile);
+          ctx.fillText(tile.letter, tileStartX + tileSize/2, tileStartY + tileSize/2);
         }
       }
     }
