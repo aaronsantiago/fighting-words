@@ -67,19 +67,30 @@
       }
     }
 
-    // generate the player letters
-    this.p1Letters = generateRandomLetters(playerHandCount);
-    this.p2Letters = generateRandomLetters(playerHandCount);
+    this.players = [];
+    for (let i = 0; i < 2; i++) {
+      let player = {
+        letters: generateRandomLetters(playerHandCount),
+        queue: "",
+        locationSelection: 0,
+        lastPressed: {},
+      };
+      this.players.push(player);
+    }
 
-    this.p1Queue = "";
-    this.p2Queue = "";
+    // // generate the player letters
+    // this.p1Letters = generateRandomLetters(playerHandCount);
+    // this.p2Letters = generateRandomLetters(playerHandCount);
 
-    this.p1LocationSelection = 0;
-    this.p2LocationSelection = 0;
+    // this.p1Queue = "";
+    // this.p2Queue = "";
 
-    // need this to only respond to keydowns
-    this.p1LastPressed = {};
-    this.p2LastPressed = {};
+    // this.p1LocationSelection = 0;
+    // this.p2LocationSelection = 0;
+
+    // // need this to only respond to keydowns
+    // this.p1LastPressed = {};
+    // this.p2LastPressed = {};
 
     this.winner = "0";
 
@@ -93,6 +104,8 @@
     }
 
     let placementIndices = [];
+    // the word needs to include at least one new letter on the board
+    let placementInEmptyTileFound = false;
     for (let i = 0; i < processedWord.length; i++) {
       let pwl = processedWord[i];
 
@@ -119,6 +132,8 @@
       // only check for negative cases and return out if it is invalid
         // if this letter is on the board and it does not match, invalid
       if (tile == "") {
+        placementInEmptyTileFound = true;
+
         // if the letter is missing on the board and we don't have it, invalid
         if (pwl[1] == "m") {
           return null;
@@ -129,16 +144,17 @@
           return null;
         }
       }
-      // if the slot is not empty and does not match, invalid
       else {
         if (tile[1] == playerNum) playerNumFound = true;
+        
+        // if the slot is not empty and does not match, invalid
         if (tile[0] != pwl[0]) {
           return null;
         }
       }
     }
     
-    if (playerNumFound) {
+    if (playerNumFound && placementInEmptyTileFound) {
       // check if the words are valid
       let rowsToCheck = [y];
       let columnsToCheck = [x];
@@ -155,6 +171,7 @@
 
       for (let ry of rowsToCheck) {
         let currentWord = "";
+
         let intersected = false;
         // |a|b| |a|b|B| 
         for (let rx = 0; rx < gridSize + 1; rx++) {
@@ -310,147 +327,71 @@
       return;
     }
     for (const [player, input] of playerInputs.entries()) {
-      // // Generate player velocity from input keys.
-      // const vel = {
-      //   x:
-      //     (input.pressed.ArrowLeft ? -1 : 0) +
-      //     (input.pressed.ArrowRight ? 1 : 0),
-      //   y:
-      //     (input.pressed.ArrowDown ? -1 : 0) +
-      //     (input.pressed.ArrowUp ? 1 : 0),
-      // };
 
-      // // Apply the velocity to the appropriate player.
-      if (player.getID() == 0) {
-        for (let letter of allLetters) {
-          if ((letter in input.pressed) && !(letter in this.p1LastPressed) ) {
-            this.p1Queue += letter;
-            this.p1LocationSelection = 0;
-          }
+      let pid = parseInt(player.getID());
+      for (let letter of allLetters) {
+        if ((letter in input.pressed) && !(letter in this.players[pid].lastPressed) ) {
+          this.players[pid].queue += letter;
+          this.players[pid].locationSelection = 0;
         }
-        if(input.pressed.Shift && !("Shift" in this.p1LastPressed)) {
-          this.p1LocationSelection += 1;
-        }
-        if(input.pressed.Enter && !("Enter" in this.p1LastPressed)) {
-          let validLocations = this.findValidLocations(this.p1Queue, this.p1Letters, "1");
-
-          if (validLocations.length > 0) {
-            //clear off player 1 tag from existing letters
-            for (let ti = 0; ti < this.board.length; ti++) {
-              if(this.board[ti][1] == "1") this.board[ti] = this.board[ti][0];
-            }
-
-            let validLocation = validLocations[this.p1LocationSelection % validLocations.length];
-            for(let z = 0; z < this.p1Queue.length; z++) {
-
-              let tileX = validLocation.x;
-              let tileY = validLocation.y;
-
-              if (validLocation.vertical) {
-                tileY = validLocation.y + z;
-              }
-              else {
-                tileX = validLocation.x + z;
-              }
-              for (let wx = tileX - 1; wx < tileX + 2; wx++) {
-                if (this.board[wx + tileY * gridSize][1] == "2") {
-                  this.winner = "1";
-                }
-              }
-              for (let wy = tileY - 1; wy < tileY + 2; wy++) {
-                if (this.board[tileX + wy * gridSize][1] == "2") {
-                  this.winner = "1";
-                }
-              }
-
-              this.board[tileX + tileY * gridSize] = this.p1Queue[z] + "1";
-            }
-            this.p1Queue = "";
-            
-            let newLetters = [];
-            for (let letter of this.p1Letters) {
-              let letterIndex = validLocation.usedLetters.indexOf(letter);
-              if (letterIndex >= 0) {
-                validLocation.usedLetters.splice(letterIndex,1);
-              }
-              else {
-                newLetters.push(letter);
-              }
-            }
-            this.p1Letters = newLetters.concat(generateRandomLetters(playerHandCount - newLetters.length));
-          }
-        }
-        if(input.pressed.Backspace) {
-          this.p1Queue = "";
-          this.p1LocationSelection = 0;
-        }
-        this.p1LastPressed = Object.assign({},input.pressed);
-      } else if (player.getID() == 1) {
-        for (let letter of allLetters) {
-          if ((letter in input.pressed) && !(letter in this.p2LastPressed) ) {
-            this.p2Queue += letter;
-            this.p2LocationSelection = 0;
-          }
-        }
-        if(input.pressed.Shift && !("Shift" in this.p2LastPressed)) {
-          this.p2LocationSelection += 1;
-        }
-        if(input.pressed.Enter && !("Enter" in this.p2LastPressed)) {
-          let validLocations = this.findValidLocations(this.p2Queue, this.p2Letters, "2");
-
-          if (validLocations.length > 0) {
-            //clear off player 1 tag from existing letters
-            for (let ti = 0; ti < this.board.length; ti++) {
-              if(this.board[ti][1] == "2") this.board[ti] = this.board[ti][0];
-            }
-
-            let validLocation = validLocations[this.p2LocationSelection % validLocations.length];
-            for(let z = 0; z < this.p2Queue.length; z++) {
-
-              let tileX = validLocation.x;
-              let tileY = validLocation.y;
-
-              if (validLocation.vertical) {
-                tileY = validLocation.y + z;
-              }
-              else {
-                tileX = validLocation.x + z;
-              }
-
-              for (let wx = tileX - 1; wx < tileX + 2; wx++) {
-                if (this.board[wx + tileY * gridSize][1] == "1") {
-                  this.winner = "2";
-                }
-              }
-              for (let wy = tileY - 1; wy < tileY + 2; wy++) {
-                if (this.board[tileX + wy * gridSize][1] == "1") {
-                  this.winner = "2";
-                }
-              }
-
-              this.board[tileX + tileY * gridSize] = this.p2Queue[z] + "2";
-            }
-            this.p2Queue = "";
-
-            let newLetters = [];
-            for (let letter of this.p2Letters) {
-              let letterIndex = validLocation.usedLetters.indexOf(letter);
-              if (letterIndex >= 0) {
-                validLocation.usedLetters.splice(letterIndex,1);
-              }
-              else {
-                newLetters.push(letter);
-              }
-            }
-            this.p2Letters = newLetters.concat(generateRandomLetters(playerHandCount - newLetters.length));
-          }
-        }
-        if(input.pressed.Backspace) {
-            this.p2LocationSelection = 0;
-          this.p2Queue = "";
-        }
-        this.p2LastPressed = Object.assign({},input.pressed);
       }
+      if(input.pressed.Shift && !("Shift" in this.players[pid].lastPressed)) {
+        this.players[pid].locationSelection += 1;
+      }
+      if(input.pressed.Enter && !("Enter" in this.players[pid].lastPressed)) {
+        let validLocations = this.findValidLocations(this.players[pid].queue, this.players[pid].letters, "" + (pid + 1));
+
+        if (validLocations.length > 0) {
+          //clear off player 1 tag from existing letters
+          for (let ti = 0; ti < this.board.length; ti++) {
+            if(this.board[ti][1] == "" + (pid + 1)) this.board[ti] = this.board[ti][0];
+          }
+
+          let validLocation = validLocations[this.players[pid].locationSelection % validLocations.length];
+          for(let z = 0; z < this.players[pid].queue.length; z++) {
+
+            let tileX = validLocation.x;
+            let tileY = validLocation.y;
+
+            if (validLocation.vertical) {
+              tileY = validLocation.y + z;
+            }
+            else {
+              tileX = validLocation.x + z;
+            }
+            for (let wx = tileX - 1; wx < tileX + 2; wx++) {
+              if (this.board[wx + tileY * gridSize][1] == "" + (1 - pid + 1)) {
+                this.winner = "" + (pid + 1);
+              }
+            }
+            for (let wy = tileY - 1; wy < tileY + 2; wy++) {
+              if (this.board[tileX + wy * gridSize][1] == "" + (1 - pid + 1)) {
+                this.winner = "" + (pid + 1);
+              }
+            }
+
+            this.board[tileX + tileY * gridSize] = this.players[pid].queue[z] + "" + (pid + 1);
+          }
+          this.players[pid].queue = "";
+          
+          let newLetters = [];
+          for (let letter of this.players[pid].letters) {
+            let letterIndex = validLocation.usedLetters.indexOf(letter);
+            if (letterIndex >= 0) {
+              validLocation.usedLetters.splice(letterIndex,1);
+            }
+            else {
+              newLetters.push(letter);
+            }
+          }
+          this.players[pid].letters = newLetters.concat(generateRandomLetters(playerHandCount - newLetters.length));
+        }
+      }
+      if(input.pressed.Backspace) {
+        this.players[pid].queue = "";
+        this.players[pid].LocationSelection = 0;
+      }
+      this.players[pid].lastPressed = Object.assign({},input.pressed);
 
     }
   }
@@ -509,16 +450,10 @@
       }
     }
     else {
-      let charsToDraw = this.p1Letters;
-      let currentQueue = this.p1Queue;
-      let locationSelection = this.p1LocationSelection;
-      let playerNum = "1";
-      if (localPlayerId == 1) { 
-        charsToDraw = this.p2Letters;
-        currentQueue = this.p2Queue;
-        locationSelection = this.p2LocationSelection;
-        playerNum = "2";
-      }
+      let charsToDraw = this.players[localPlayerId].letters;
+      let currentQueue = this.players[localPlayerId].queue;
+      let locationSelection = this.players[localPlayerId].locationSelection;
+      let playerNum = "" + (localPlayerId + 1);
 
       ctx.font = '25px Arial';
       ctx.textBaseline = 'middle'; 
@@ -559,11 +494,6 @@
         }
       }
     }
-    // // Draw squares for the players.
-    // ctx.fillStyle = "red";
-    // ctx.fillRect(this.aPos.x - 5, this.aPos.y - 5, 10, 10);
-    // ctx.fillStyle = "blue";
-    // ctx.fillRect(this.bPos.x - 5, this.bPos.y - 5, 10, 10);
   }
 }
 
