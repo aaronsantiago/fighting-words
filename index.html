@@ -26,7 +26,7 @@ function shuffle(array) {
   const startingPositionOffset = 5;
   const playerHandCount = 8;
   const allowOffscreenPlacements = false;
-  const tileLifespan = 30 * 60;
+  const tileLifespan = 10 * 60;
 
   // some useful constants
     // (i'm a colemak main)
@@ -420,7 +420,7 @@ function shuffle(array) {
 
     }
     for (let tile of this.board) {
-      if (tile.frame + tileLifespan > this.currentFrame && tile.player == "") {
+      if (tile.frame + tileLifespan < this.currentFrame && tile.player == "") {
         Object.assign(tile, this.makeEmptyTile());
       }
     }
