@@ -9,6 +9,7 @@
   const startingPositionOffset = 5;
   const playerHandCount = 8;
   const allowOffscreenPlacements = false;
+  const tileLifespan = 60 * 60;
 
   // some useful constants
     // (i'm a colemak main)
@@ -18,13 +19,6 @@
 
   // variables
   let localPlayerId = 0;
-
-  function makeEmptyTile() {
-    return {
-      letter: "",
-      player: "",
-    };
-  }
 
   // utility functions
   function generateRandomLetters(count) {
@@ -63,7 +57,7 @@
     this.board = [];
     // leave room for the stack at the bottom
     for(let i = 0; i < gridSize * (gridSize - 1); i++) {
-      let tile = makeEmptyTile();
+      let tile = this.makeEmptyTile();
       if (i == p1Pos) {
         tile.letter = "a";
         tile.player = "1";
@@ -87,7 +81,16 @@
     }
 
     this.winner = "0";
+    this.currentFrame = 0;
+  }
+  
 
+  makeEmptyTile() {
+    return {
+      letter: "",
+      player: "",
+      frame: this.currentFrame,
+    };
   }
 
   validatePlacement(processedWord, x, y, vertical, heldCounts, playerNum) {
@@ -123,7 +126,7 @@
 
 
       let tile = this.board[tx + ty * gridSize];
-      if (tile == null) tile = makeEmptyTile();
+      if (tile == null) tile = this.makeEmptyTile();
       // only check for negative cases and return out if it is invalid
         // if this letter is on the board and it does not match, invalid
       if (tile.letter == "") {
@@ -171,7 +174,7 @@
         // |a|b| |a|b|B| 
         for (let rx = 0; rx < gridSize + 1; rx++) {
           let tileIndex = rx + ry * gridSize;
-          let tileLetter = this.board[tileIndex]?.letter;
+          let tileLetter = this.board[tileIndex].letter;
           
           // check intersection with current placement
           let placementIndex = placementIndices.indexOf(tileIndex);
@@ -213,22 +216,18 @@
         // |a|b| |a|b|B| 
         for (let cy = 0; cy < gridSize; cy++) {
           let tileIndex = cx + cy * gridSize;
-          let tile = this.board[tileIndex];
-          if (tile == null) {
-            tile = makeEmptyTile();
+          let tileLetter = this.board[tileIndex]?.letter;
+          if (tileLetter == null) {
+            tileLetter = "";
           }
-          else {
-            tile = tile.letter;
-          }
-          
           // check intersection with current placement
           let placementIndex = placementIndices.indexOf(tileIndex);
           if (placementIndex >= 0) {
             intersected = true;
-            tile = processedWord[placementIndex][0];
+            tileLetter = processedWord[placementIndex][0];
           }
 
-          if (tile == null || tile.letter == "" || cy >= gridSize - 1) {
+          if (tileLetter == "" || cy >= gridSize - 1) {
             // end case
             if(intersected) {
               // console.log("col: " + cy + "vertical: " + vertical);
@@ -243,7 +242,7 @@
             intersected = false;
           }
           else {
-            currentWord += tile.letter;
+            currentWord += tileLetter;
           }
         }
       }
@@ -376,6 +375,7 @@
 
             this.board[tileX + tileY * gridSize].letter = this.players[pid].queue[z];
             this.board[tileX + tileY * gridSize].player = "" + (pid + 1);
+            this.board[tileX + tileY * gridSize].frame = this.currentFrame;
           }
           this.players[pid].queue = "";
           
@@ -399,6 +399,12 @@
       this.players[pid].lastPressed = Object.assign({},input.pressed);
 
     }
+    for (let tile of this.board) {
+      if (tile.frame + tileLifespan > this.currentFrame && tile.player == "") {
+        // tile = this.makeEmptyTile();
+      }
+    }
+    this.currentFrame += 1;
   }
 
   draw(canvas) {
