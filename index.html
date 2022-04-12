@@ -401,7 +401,7 @@
     }
     for (let tile of this.board) {
       if (tile.frame + tileLifespan > this.currentFrame && tile.player == "") {
-        tile = this.makeEmptyTile();
+        Object.assign(tile, this.makeEmptyTile());
       }
     }
     this.currentFrame += 1;
