@@ -194,7 +194,6 @@
               // console.log(currentWord);
               // console.log(currentWord.toUpperCase());
               // console.log(currentWord.toUpperCase() in scrabbleWords);
-              // if (!(true) && currentWord.length > 1) {
               if (!(currentWord.toUpperCase() in scrabbleWords) && currentWord.length > 1) {
                 return null;
               }
@@ -229,7 +228,7 @@
             tile = processedWord[placementIndex][0];
           }
 
-          if (tile == null || tile.letter == "" || cy >= gridSize) {
+          if (tile == null || tile.letter == "" || cy >= gridSize - 1) {
             // end case
             if(intersected) {
               // console.log("col: " + cy + "vertical: " + vertical);
@@ -244,7 +243,7 @@
             intersected = false;
           }
           else {
-            currentWord += tile;
+            currentWord += tile.letter;
           }
         }
       }
@@ -336,6 +335,9 @@
           this.players[pid].queue += letter;
           this.players[pid].locationSelection = 0;
         }
+      }
+      if(input.pressed["1"] && !("1" in this.players[pid].lastPressed)) {
+        this.players[pid].letters = generateRandomLetters(playerHandCount);
       }
       if(input.pressed.Shift && !("Shift" in this.players[pid].lastPressed)) {
         this.players[pid].locationSelection += 1;
