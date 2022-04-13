@@ -18389,7 +18389,7 @@ class RollbackNetcode {
             chai__WEBPACK_IMPORTED_MODULE_3__.assert.isTrue(player.isRemotePlayer(), `'player' must be a remote player.`);
         _debugging__WEBPACK_IMPORTED_MODULE_2__.DEV && chai__WEBPACK_IMPORTED_MODULE_3__.assert.isNotEmpty(this.history, `'history' cannot be empty.`);
         let expectedFrame = (0,_utils__WEBPACK_IMPORTED_MODULE_0__.get)(this.highestFrameReceived, player) + 1;
-        _debugging__WEBPACK_IMPORTED_MODULE_2__.DEV && chai__WEBPACK_IMPORTED_MODULE_3__.assert.equal(expectedFrame, frame);
+        // _debugging__WEBPACK_IMPORTED_MODULE_2__.DEV && chai__WEBPACK_IMPORTED_MODULE_3__.assert.equal(expectedFrame, frame);
         this.highestFrameReceived.set(player, expectedFrame);
         // If this input is for a frame that we haven't even simulated, we need to
         // store it in a queue to pull during our next tick.
